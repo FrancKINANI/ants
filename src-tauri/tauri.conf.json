@@ -17,7 +17,6 @@
         "alwaysOnTop": true,
         "decorations": false,
         "resizable": false,
-        "fullscreen": true,
         "skipTaskbar": true
       }
     ],

@@ -21,10 +21,13 @@ use instrumentation::Logger;
 use std::sync::Mutex;
 use tauri::Manager;
 
+use std::time::Instant;
+
 /// Application state shared between Tauri commands.
 struct AppState {
     score_engine: Mutex<ScoreEngine>,
     logger: Mutex<Logger>,
+    last_poll: Mutex<Instant>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -38,6 +41,7 @@ pub fn run() {
         .manage(AppState {
             score_engine: Mutex::new(score_engine),
             logger: Mutex::new(logger),
+            last_poll: Mutex::new(Instant::now()),
         })
         .setup(|app| {
             // Get the main webview window
@@ -69,6 +73,25 @@ pub fn run() {
                 }
             );
 
+            // Resize window to cover the full screen (avoids fullscreen+transparent bug on Wayland)
+            match window.primary_monitor() {
+                Ok(Some(monitor)) => {
+                    let size = monitor.size();
+                    let _ = window.set_size(tauri::PhysicalSize {
+                        width: size.width,
+                        height: size.height,
+                    });
+                    let _ = window.set_position(tauri::PhysicalPosition { x: 0, y: 0 });
+                    println!(
+                        "[Ants] Resized overlay to {}x{}",
+                        size.width, size.height
+                    );
+                }
+                _ => {
+                    eprintln!("[Ants] Warning: could not get primary monitor info");
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -79,6 +102,7 @@ pub fn run() {
             log_ant_spawn,
             log_ant_dismiss,
             log_user_left,
+            force_low_score,
             flush_logger,
         ])
         .run(tauri::generate_context!())
@@ -104,8 +128,17 @@ fn feed_event(
 #[tauri::command]
 fn get_score_snapshot(state: tauri::State<'_, AppState>) -> score::ScoreSnapshot {
     let mut engine = state.score_engine.lock().unwrap();
-    // Update with a small delta to process time-based decay
-    engine.update(std::time::Duration::from_millis(16)); // ~60fps tick
+    let mut last_poll = state.last_poll.lock().unwrap();
+
+    // Use actual elapsed time since last poll for accurate score decay
+    let now = Instant::now();
+    let elapsed = now.duration_since(*last_poll);
+    *last_poll = now;
+
+    // Cap at 2 seconds to avoid huge jumps after pause/resume
+    let dt = elapsed.min(std::time::Duration::from_secs(2));
+    engine.update(dt);
+
     let snapshot = engine.snapshot();
 
     // Also log the score reading
@@ -157,6 +190,14 @@ fn log_ant_dismiss(state: tauri::State<'_, AppState>) {
 fn log_user_left(state: tauri::State<'_, AppState>) {
     if let Ok(mut logger) = state.logger.lock() {
         logger.record_user_left();
+    }
+}
+
+/// Debug: force the score to a very low value so ants appear immediately.
+#[tauri::command]
+fn force_low_score(state: tauri::State<'_, AppState>) {
+    if let Ok(mut engine) = state.score_engine.lock() {
+        engine.force_score(5.0);
     }
 }
 

@@ -80,6 +80,11 @@ document.addEventListener('DOMContentLoaded', () => {
       engine.reset();
       invoke('reset_score');
     }
+    // Debug: press D to force ants to appear immediately
+    if (e.key.toLowerCase() === 'd' && !e.ctrlKey && !e.metaKey) {
+      invoke('force_low_score');
+      console.log('[Ants] Debug: forced low score');
+    }
   });
 
   console.log('[Ants] Engine started');

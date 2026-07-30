@@ -282,6 +282,11 @@ impl ScoreEngine {
         self.last_update = now;
     }
 
+    /// Force the score to a specific value (for debugging).
+    pub fn force_score(&mut self, value: f64) {
+        self.score = value.clamp(0.0, 100.0);
+    }
+
     /// Reset the score to 100 and clear all state.
     pub fn reset(&mut self) {
         let now = Instant::now();
