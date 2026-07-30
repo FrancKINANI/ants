@@ -19,7 +19,9 @@ async function invoke(cmd, args = {}) {
     } catch (err) {
       console.warn(`[Ants] invoke('${cmd}') failed:`, err);
     }
+    return;
   }
+  console.warn(`[Ants] Tauri IPC not available — invoke('${cmd}') skipped`);
   return null;
 }
 
@@ -33,23 +35,48 @@ document.addEventListener('DOMContentLoaded', () => {
   let pollTimer = 0;
   const POLL_INTERVAL = 1.0; // seconds
 
-  // Attach score polling callback
+  // ── Demo mode (when Tauri backend is unavailable) ──
+  let demoActive = false;
+  let demoTime = 0;
+  let failCount = 0;
+
+  function triggerDemo() {
+    demoActive = true;
+    demoTime = 75; // Score starts at ~25 (moderate level — 1 ant appears)
+    engine.setLevel('moderate', 25);
+    console.log('[Ants] Demo mode activated');
+  }
+
   engine.onPollScore = async (eng) => {
-    // The loop calls this every frame; throttle to once per second
     const dt = (performance.now() - eng.lastTime) / 1000 || 0.016;
     pollTimer += dt;
     if (pollTimer < POLL_INTERVAL) return;
     pollTimer = 0;
 
-    const snap = await invoke('get_score_snapshot');
-    if (!snap) return;
-
-    eng.setLevel(snap.level, snap.score);
-
-    // If user recovered significantly, log it
-    if (snap.score > 60 && snap.level === 'none') {
-      await invoke('log_user_left');
+    if (!demoActive) {
+      const snap = await invoke('get_score_snapshot');
+      if (snap) {
+        eng.setLevel(snap.level, snap.score);
+        if (snap.score > 60 && snap.level === 'none') {
+          await invoke('log_user_left');
+        }
+        return;
+      }
+      // Backend unavailable — activate demo after 5 failed polls
+      if (++failCount >= 5) {
+        triggerDemo();
+      }
+      return;
     }
+
+    // Demo mode: simulate score decay at 2 pts/sec
+    demoTime += POLL_INTERVAL * 2;
+    const simulatedScore = Math.max(0, 100 - demoTime);
+    const level = simulatedScore >= 40 ? 'none'
+      : simulatedScore >= 25 ? 'moderate'
+      : simulatedScore >= 10 ? 'present'
+      : 'invasion';
+    eng.setLevel(level, simulatedScore);
   };
 
   // Listen for tray "reset" events
@@ -82,8 +109,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // Debug: press D to force ants to appear immediately
     if (e.key.toLowerCase() === 'd' && !e.ctrlKey && !e.metaKey) {
-      invoke('force_low_score');
-      console.log('[Ants] Debug: forced low score');
+      if (window.__TAURI__?.core) {
+        invoke('force_low_score');
+        console.log('[Ants] Debug: force_low_score via backend');
+      } else {
+        // Fallback: trigger demo mode directly
+        triggerDemo();
+        // Override to invasion level for immediate effect
+        engine.setLevel('invasion', 5);
+        console.log('[Ants] Debug: demo mode triggered directly');
+      }
     }
   });
 

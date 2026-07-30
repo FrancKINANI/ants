@@ -47,11 +47,12 @@ pub fn run() {
             // Get the main webview window
             let window = app.get_webview_window("main").unwrap();
 
-            // Enable global click-through — mouse events pass through
-            // the transparent background to the windows below.
-            window
-                .set_ignore_cursor_events(true)
-                .expect("Failed to set ignore cursor events");
+            // Note: set_ignore_cursor_events(true) is intentionally NOT called here.
+            // On Wayland/GNOME it blocks ALL mouse events in the webview (not just
+            // passes them through), which breaks scroll detection, ant clicking,
+            // and even keyboard IPC. Instead, click-through is handled purely via
+            // CSS `pointer-events: none` on the canvas background, with hit-testing
+            // for ant regions (see ants.js _bindEvents).
 
             // Ensure always-on-top is enforced programmatically
             window
