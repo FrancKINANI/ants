@@ -1,112 +1,81 @@
-// Phase 0 — Overlay Spike Test: Frontend Logic
-//
-// This test validates:
-//   1. The transparent overlay renders correctly
-//   2. Click-through works (background clicks pass through to windows below)
-//   3. Specific UI elements (the "ant" placeholders) are clickable
-//   4. The overlay is always-on-top
+/**
+ * Ants — Main Entry Point
+ *
+ * Integrates the Canvas ant engine with the Tauri v2 backend:
+ * - Polls Attention Score from Rust backend every ~1s
+ * - Feeds input events (keyboard, scroll, click) to the score engine
+ * - Listens for tray "reset" events
+ * - Handles keyboard shortcuts (Esc=quit, R=reset)
+ */
 
-const { invoke } = window.__TAURI__?.core || {};
+import { AntEngine } from './ants.js';
+
+// ── Tauri invoke helper ──
+
+async function invoke(cmd, args = {}) {
+  if (window.__TAURI__?.core) {
+    try {
+      return await window.__TAURI__.core.invoke(cmd, args);
+    } catch (err) {
+      console.warn(`[Ants] invoke('${cmd}') failed:`, err);
+    }
+  }
+  return null;
+}
+
+// ── Main ──
 
 document.addEventListener('DOMContentLoaded', () => {
-  const clickLog = document.getElementById('click-log');
-  const platformInfo = document.getElementById('platform-info');
-  const testAnts = document.querySelectorAll('.test-ant');
+  const canvas = document.getElementById('ant-canvas');
+  if (!canvas) { console.error('[Ants] Canvas missing'); return; }
 
-  // ── Platform Detection ──
+  const engine = new AntEngine(canvas);
+  let pollTimer = 0;
+  const POLL_INTERVAL = 1.0; // seconds
 
-  function detectPlatform() {
-    const ua = navigator.userAgent;
-    let os = 'unknown';
-    if (ua.includes('Windows')) os = 'Windows';
-    else if (ua.includes('Mac OS')) os = 'macOS';
-    else if (ua.includes('Linux')) os = 'Linux';
+  // Attach score polling callback
+  engine.onPollScore = async (eng) => {
+    // The loop calls this every frame; throttle to once per second
+    const dt = (performance.now() - eng.lastTime) / 1000 || 0.016;
+    pollTimer += dt;
+    if (pollTimer < POLL_INTERVAL) return;
+    pollTimer = 0;
 
-    const isWayland = ua.includes('Wayland') ||
-                      window.location.href.includes('wayland');
+    const snap = await invoke('get_score_snapshot');
+    if (!snap) return;
 
-    platformInfo.textContent = `Platform: ${os}${isWayland ? ' (Wayland)' : ''} | Tauri v2 | Transparent: ✓ | AlwaysOnTop: ✓ | ClickThrough: testing...`;
+    eng.setLevel(snap.level, snap.score);
 
-    return { os, isWayland };
-  }
+    // If user recovered significantly, log it
+    if (snap.score > 60 && snap.level === 'none') {
+      await invoke('log_user_left');
+    }
+  };
 
-  const platform = detectPlatform();
-
-  // ── Click Handling ──
-  // When an ant placeholder is clicked, it proves that
-  // per-region click-through is working: the ant catches
-  // the click while the transparent background lets clicks pass.
-
-  testAnts.forEach((ant) => {
-    ant.addEventListener('click', (e) => {
-      e.stopPropagation();
-
-      const index = ant.dataset.index;
-      const now = new Date().toLocaleTimeString();
-
-      // Visual feedback
-      ant.classList.add('squashed');
-
-      clickLog.textContent = `🐜 Ant #${index} squashed at ${now} — Per-region click-through: ✓`;
-
-      // Reset after animation
-      setTimeout(() => {
-        ant.classList.remove('squashed');
-      }, 600);
+  // Listen for tray "reset" events
+  if (window.__TAURI__?.core) {
+    window.__TAURI__.core.listen('ants:reset', () => {
+      engine.reset();
+      invoke('reset_score');
     });
-  });
-
-  // ── Click-through background test ──
-  // Clicking on the transparent background should NOT trigger anything
-  // because the events pass through to windows behind the overlay.
-
-  document.getElementById('overlay').addEventListener('click', (e) => {
-    // Only log if not clicking on an ant
-    if (!e.target.closest('.test-ant')) {
-      clickLog.textContent = 'Click on background — should pass through to window below. Check if underlying app received it.';
-    }
-  });
-
-  // ── Tauri Commands (if available) ──
-
-  async function toggleClickThrough(enabled) {
-    if (!invoke) return;
-    try {
-      await invoke('toggle_click_through', { enabled });
-      const status = document.getElementById('status-text');
-      status.textContent = enabled
-        ? 'Overlay Active — Click-through enabled'
-        : 'Click-through disabled — overlay captures all clicks';
-    } catch (err) {
-      console.error('Failed to toggle click-through:', err);
-    }
   }
 
-  // Expose toggle to console for manual testing
-  window.toggleOverlay = toggleClickThrough;
+  // Start
+  engine.start();
 
-  // ── Keyboard shortcuts for testing ──
-
+  // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      // Quit the app via Tauri API
       if (window.__TAURI__?.process) {
         window.__TAURI__.process.exit(0);
       }
     }
-    if (e.key === 'c' && e.ctrlKey) {
-      e.preventDefault();
-      toggleClickThrough(false);
-    }
-    if (e.key === 'v' && e.ctrlKey) {
-      e.preventDefault();
-      toggleClickThrough(true);
+    if (e.key.toLowerCase() === 'r') {
+      engine.reset();
+      invoke('reset_score');
     }
   });
 
-  // ── Initial diagnostics ──
-
-  console.log('[Ants Phase 0] Overlay initialized.');
-  console.log(`[Ants Phase 0] Platform: ${platform.os} ${platform.isWayland ? '(Wayland)' : ''}`);
-  console.log('[Ants Phase 0] Keyboard shortcuts: Esc=quit, Ctrl+C=disable click-through, Ctrl+V=enable click-through');
+  console.log('[Ants] Engine started');
+  console.log(`[Ants] Canvas: ${engine.width}x${engine.height} @ ${engine.dpr}x`);
 });
