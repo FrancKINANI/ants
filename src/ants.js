@@ -31,6 +31,8 @@ const CFG = {
   fadeInDuration: 500,
   fadeOutDuration: 800,
   squashDuration: 400,
+  enableSound: true,
+  squashSoundVolume: 0.3,
 };
 
 let nextId = 0;
@@ -189,6 +191,63 @@ function hitTest(ant, mx, my, dpr) {
   return dx * dx + dy * dy <= r * r;
 }
 
+// ── Procedural Sound (Web Audio API) ──
+// No audio files needed — gentle splat generated at runtime.
+
+class Sound {
+  constructor() {
+    this.ctx = null;
+    this.enabled = CFG.enableSound;
+    try {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch {
+      this.enabled = false;
+    }
+  }
+
+  /** Gentle squish/splat — short noise burst with low thump */
+  squash() {
+    if (!this.enabled || !this.ctx) return;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    const vol = CFG.squashSoundVolume;
+
+    // ── Noise burst (the "splat") ──
+    const noiseLen = 0.08;
+    const noise = ctx.createBufferSource();
+    const buf = ctx.createBuffer(1, ctx.sampleRate * noiseLen, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.02));
+    }
+    noise.buffer = buf;
+
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(vol * 0.6, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + noiseLen);
+
+    noise.connect(noiseGain).connect(ctx.destination);
+    noise.start(now);
+    noise.stop(now + noiseLen);
+
+    // ── Low thump (the "squish") ──
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(120, now);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.06);
+
+    const oscGain = ctx.createGain();
+    oscGain.gain.setValueAtTime(vol * 0.5, now);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+    osc.connect(oscGain).connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.08);
+  }
+}
+
 // ── Engine ──
 
 export class AntEngine {
@@ -202,6 +261,7 @@ export class AntEngine {
     this.currentLevel = 'none';
     this.running = false;
     this.onPollScore = null;
+    this.sound = new Sound();
 
     this._els = {
       log: document.getElementById('click-log'),
@@ -300,6 +360,7 @@ export class AntEngine {
       for (const a of this.ants) {
         if (hitTest(a, mx, my, this.dpr)) {
           a.state = 'squashed';
+          this.sound.squash();
           this._log(`Dismissed ant #${a.id}`);
           this._invoke('feed_event', { eventType: 'click' });
           this._invoke('log_ant_dismiss');

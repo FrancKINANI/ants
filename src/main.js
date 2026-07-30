@@ -60,6 +60,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Flush logs when the app closes (beforeunload + Tauri close)
+  async function flushLogs() {
+    await invoke('flush_logger');
+  }
+  window.addEventListener('beforeunload', flushLogs);
+
   // Start
   engine.start();
 

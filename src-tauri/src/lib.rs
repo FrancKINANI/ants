@@ -79,6 +79,7 @@ pub fn run() {
             log_ant_spawn,
             log_ant_dismiss,
             log_user_left,
+            flush_logger,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -157,4 +158,14 @@ fn log_user_left(state: tauri::State<'_, AppState>) {
     if let Ok(mut logger) = state.logger.lock() {
         logger.record_user_left();
     }
+}
+
+/// Flush the session log to disk.
+/// Should be called when the app is closing.
+#[tauri::command]
+fn flush_logger(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    if let Ok(mut logger) = state.logger.lock() {
+        logger.flush().map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
