@@ -1,0 +1,172 @@
+/* Phase 0 — Transparent Overlay Spike Styles */
+/* The overlay itself is transparent; only UI elements are visible. */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent !important;
+  /* Important: no background color — the window is transparent */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#overlay {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Status Bar ── */
+
+#status-bar {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 20px;
+  color: #e0e0e0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  pointer-events: none;
+  z-index: 100;
+  transition: opacity 0.3s;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status-dot.active {
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.6);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ── Test Ants (placeholder clickable regions) ── */
+
+#test-area {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* Container doesn't intercept clicks */
+}
+
+.test-ant {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto; /* These ARE clickable */
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.test-ant:hover {
+  transform: scale(1.15);
+}
+
+.test-ant:active {
+  transform: scale(0.9);
+}
+
+.ant-body {
+  width: 28px;
+  height: 28px;
+  background: rgba(30, 30, 30, 0.9);
+  border-radius: 50%;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 0 4px rgba(255, 255, 255, 0.05);
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.test-ant:hover .ant-body {
+  background: rgba(60, 60, 60, 0.9);
+}
+
+.test-ant.squashed .ant-body {
+  background: rgba(80, 60, 40, 0.7);
+  transform: scale(0.3);
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+
+.test-ant.squashed .ant-label {
+  color: #ff6b6b;
+  text-decoration: line-through;
+}
+
+.ant-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ── Debug Panel ── */
+
+#debug {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 100;
+}
+
+#click-log {
+  padding: 6px 14px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  transition: opacity 0.2s;
+}
+
+#platform-info {
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+/* ── Utility ── */
+
+.hidden {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

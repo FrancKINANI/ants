@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ants — Phase 0 Overlay Test</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="overlay">
+    <!-- Header with status info -->
+    <div id="status-bar">
+      <span id="status-indicator" class="status-dot active"></span>
+      <span id="status-text">Overlay Active — Click-through enabled</span>
+    </div>
+
+    <!-- Phase 0 test: placeholder "ants" (clickable circles) -->
+    <div id="test-area">
+      <div class="test-ant" data-index="0"
+           style="top: 15%; left: 20%;"
+           title="Clickable region (placeholder ant)">
+        <div class="ant-body"></div>
+        <span class="ant-label">Ant #1</span>
+      </div>
+      <div class="test-ant" data-index="1"
+           style="top: 40%; left: 60%;"
+           title="Clickable region (placeholder ant)">
+        <div class="ant-body"></div>
+        <span class="ant-label">Ant #2</span>
+      </div>
+      <div class="test-ant" data-index="2"
+           style="top: 70%; left: 35%;"
+           title="Clickable region (placeholder ant)">
+        <div class="ant-body"></div>
+        <span class="ant-label">Ant #3</span>
+      </div>
+    </div>
+
+    <!-- Debug info -->
+    <div id="debug">
+      <div id="click-log">Click on an ant to test click-through regions</div>
+      <div id="platform-info">Loading platform info...</div>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
