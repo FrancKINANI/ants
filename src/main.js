@@ -107,6 +107,24 @@ document.addEventListener('DOMContentLoaded', () => {
       engine.reset();
       invoke('reset_score');
     }
+    // H: Toggle overlay visibility (click-through when hidden)
+    if (e.key.toLowerCase() === 'h' && !e.ctrlKey && !e.metaKey) {
+      const w = window.__TAURI__?.window?.getCurrent?.();
+      if (w) {
+        w.isVisible().then((visible) => {
+          if (visible) {
+            w.hide();
+            console.log('[Ants] Overlay hidden — clicks pass through');
+          } else {
+            w.show();
+            console.log('[Ants] Overlay shown');
+          }
+        });
+      } else {
+        console.log('[Ants] Press H to toggle overlay (IPC unavailable)');
+      }
+    }
+
     // Debug: press D to force ants to appear immediately
     if (e.key.toLowerCase() === 'd' && !e.ctrlKey && !e.metaKey) {
       if (window.__TAURI__?.core) {
